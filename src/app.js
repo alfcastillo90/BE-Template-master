@@ -36,7 +36,6 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
 });
 
 /**
- * @params contractId
  * @header profile_id
  * @returns list of non-terminated contracts belonging to a user (client or contractor)
  */
@@ -64,6 +63,41 @@ app.get('/contracts/',getProfile ,async (req, res) =>{
     res.status(500).json({ 
       message: error.message
     });
+  }
+});
+
+/**
+ * @header profile_id
+ * @returns list of all unpaid jobs for a user (either a client or contractor), for active contracts only.
+ */
+app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
+  const {Job, Contract} = req.app.get('models');
+  const profileId = req.profile.id;
+  try {
+    const jobs = await Job.findAll({
+      include: [{
+          attributes: [],
+          model: Contract,
+          required: true,
+          where: {
+              [Op.or]: [
+                  { ClientId: profileId }, 
+                  { ContractorId: profileId }
+              ]
+          }
+      }],
+      where: {
+          paid: null,  // even though default is false it shows up as null
+      }
+    })
+
+      if(jobs.length > 0) {
+        res.json(jobs);
+      } else {
+        res.status(404).json({ message: 'No data' });
+      }
+  } catch (error) {
+      res.status(500).json({ message: error.message })
   }
 })
 
