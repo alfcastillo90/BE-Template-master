@@ -28,10 +28,44 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
     } 
   });
   
-  if (!contract) { 
-    return res.status(404).json({message: 'Not found'})
-  } else {
+  if (contract) { 
     res.json(contract);
+  } else {
+    res.status(404).json({ message: 'No data' });
   }
 });
+
+/**
+ * @params contractId
+ * @header profile_id
+ * @returns list of non-terminated contracts belonging to a user (client or contractor)
+ */
+
+app.get('/contracts/',getProfile ,async (req, res) =>{
+  const { Contract } = req.app.get('models')
+  const profileId = req.profile.id
+  try {
+      const contracts = await Contract.findAll({
+          where: {
+              [Op.or]: [
+                  { ClientId: profileId }, 
+                  { ContractorId: profileId }
+              ],
+              [Op.not]: { status: 'terminated' }, 
+          }
+      });
+
+      if(contracts.length > 0) {
+        res.json(contracts);
+      } else {
+        res.status(404).json({ message: 'No data' });
+      }  
+  } catch (error) {
+    res.status(500).json({ 
+      message: error.message
+    });
+  }
+})
+
+
 module.exports = app;
