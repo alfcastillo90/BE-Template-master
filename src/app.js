@@ -1,12 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { sequelize } = require('./model');
+const { sequelize, Profile } = require('./model');
 const { getProfile } = require('./middleware/getProfile');
 const app = express();
 app.use(bodyParser.json());
 app.set('sequelize', sequelize);
 app.set('models', sequelize.models);
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const { body, validationResult, query, param } = require('express-validator');
 
 /**
@@ -231,7 +231,7 @@ app.post('/balances/deposit/:user_id', param('user_id').isNumeric(), body('amoun
     if (!job) {
       return res.status(422).json({ message: `No jobs found` });
     } else {
-      const maximumValue = result.toPay * 1.25;
+      const maximumValue = job.toPay * 1.25;
       
       if (amount > maximumValue) {
         return res.status(422).json({ message: `A client can't deposit more than 25% his total of jobs to pay` });
@@ -293,8 +293,8 @@ app.get('/admin/best-profession', query('start').isDate(), query('end').isDate()
       return res.status(422).json({ message: `No jobs found` });
     } else {
       return res.json({
-        totalEarned: result.dataValues.totalEarned,
-        professional: result.dataValues.Contract.Contractor
+        totalEarned: job.dataValues.totalEarned,
+        professional: job.dataValues.Contract.Contractor
       }) 
     }
   } catch (error) {
@@ -322,7 +322,7 @@ app.get('/admin/best-clients', query('start').isDate(), query('end').isDate(), g
       return res.status(422).json({ errors: errors.array() });
     }
     
-    const job = await Job.findAll({
+    const jobs = await Job.findAll({
         raw: true,
         attributes: [[fn('SUM', col('price')), 'totalPaid']],
         include: [{
@@ -345,13 +345,13 @@ app.get('/admin/best-clients', query('start').isDate(), query('end').isDate(), g
         limit
     });
     
-    if (!job) {
+    if (!jobs) {
       return res.status(422).json({ message: `No jobs found` });
     } else {
       return res.json(
-        results.map(job => ({
-          id: job.Contract.Client.id,
-          fullName: `${job.Contract.Client.firstName} ${job.Contract.Client.lastName}`,
+        jobs.map(job => ({
+          id: job['Contract.Client.id'],
+          fullName: `${job['Contract.Client.firstName']} ${job['Contract.Client.lastName']}`,
           paid: job.totalPaid,
         })
       ));
