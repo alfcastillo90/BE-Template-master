@@ -94,7 +94,7 @@ app.get('/jobs/unpaid', getProfile, async (req, res) =>{
           }
       }],
       where: {
-          paid: null,  // even though default is false it shows up as null
+          paid: null,
       }
     })
 
@@ -146,7 +146,7 @@ app.post('/jobs/:job_id/pay', param('job_id').isNumeric(), getProfile, async (re
             required: true,
             where: { ClientId: profileId }
         }],
-        where: {id: jobId}
+        where: { id: jobId }
     });
 
     if(!job) {
