@@ -221,6 +221,52 @@ app.post('/balances/deposit/:user_id', async (req, res) =>{
   } catch (error) {
       res.status(500).end()
   }
+});
+
+/**
+ * @params start: start date
+ * @params end: end date
+ * @header profile_id
+ * @returns {totalEarned, professional }
+ */
+
+app.get('/admin/best-profession',async (req, res) =>{
+  const { start, end } = req.query
+  const { Job, Contract } = req.app.get('models')
+  try {
+    const [job] = await Job.findAll({
+        attributes: [[fn('SUM', col('price')), 'totalEarned']],
+        include: [{
+            model: Contract,
+            required: true,
+            include: [
+                {
+                    model: Profile,
+                    required: true,
+                    as: 'Contractor'
+                }
+            ]
+        }],
+        where: {
+            paymentDate: { [Op.between]: [start, end] },
+            paid: true
+        },
+        group: ['Contract.ContractorId'],
+        order: [[col('totalEarned'), 'DESC']],
+        limit: 1
+    });
+
+    if (!job) {
+      res.status(422).json({ message: `No jobs found` });
+    } else {
+      res.json({
+        totalEarned: result.dataValues.totalEarned,
+        professional: result.dataValues.Contract.Contractor
+      }) 
+    }
+  } catch (error) {
+      res.status(500).end()
+  }
 })
 
 
