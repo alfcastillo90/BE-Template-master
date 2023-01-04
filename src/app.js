@@ -131,14 +131,14 @@ app.post('/jobs/:job_id/pay',getProfile ,async (req, res) =>{
     });
 
     if(!job) {
-      return res.status(422).json({
+      res.status(422).json({
           message: `There are not any jobs for client with profile id ${profileId}`
       })
     }
     const jobPrice = job.price;
 
     if(profileBalance < jobPrice) {
-      return res.status(422).json({
+      res.status(422).json({
         message: `Profile balance amount must be major than job price`
       })
     }
@@ -157,10 +157,70 @@ app.post('/jobs/:job_id/pay',getProfile ,async (req, res) =>{
       result: true
     })
   } catch (error) {
-      if (transaction) await transaction.rollback()
-      return res.status(500).end()
+      if (transaction) {
+        await transaction.rollback()
+      }
+
+      res.status(500).json({
+        message: error.message
+      })
   }
+});
+
+/**
+ * @params user_id
+ * @body amount
+ * @header profile_id
+ * @returns Profile
+ */
+
+app.post('/balances/deposit/:user_id', async (req, res) =>{
+  const { Job, Contract, Profile } = req.app.get('models')
+  const userId = req.params.user_id;
+  const amount = req.body.amount;
   
+  try {
+    const profile = await Profile.findOne({ where: { id: userId } });
+
+    if (profile.type !== 'client') {
+      res.status(422).json({
+        message: 'This operation is just available for clients'
+      })
+    }
+
+    const job = await Job.findOne({
+        attributes: [[fn('SUM', col('price')), 'toPay']],
+        raw: true,
+        include: [{
+            attributes: [],
+            model: Contract,
+            required: true,
+            where: { ClientId: profile.id }
+        }],
+        where: {
+            paid: null
+        },
+        group: ['Contract.ClientId']
+    });
+
+    if (!job) {
+      res.status(422).json({ message: `No jobs found` });
+    } else {
+      const maximumValue = result.toPay * 1.25;
+      
+      if (amount > maximumValue) {
+        res.status(422).json({ message: `A client can't deposit more than 25% his total of jobs to pay` });
+      }
+
+      await Profile.increment('balance', { by: amount, where: { id: userId } })
+      const updatedProfile = await Profile.findOne({where: {id: userId}})
+  
+      res.json(updatedProfile)
+    }
+      
+  } catch (error) {
+      res.status(500).end()
+  }
 })
 
 
