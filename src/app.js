@@ -219,7 +219,9 @@ app.post('/balances/deposit/:user_id', async (req, res) =>{
     }
       
   } catch (error) {
-      res.status(500).end()
+    res.status(500).json({
+      message: error.message
+    })
   }
 });
 
@@ -265,7 +267,57 @@ app.get('/admin/best-profession',async (req, res) =>{
       }) 
     }
   } catch (error) {
-      res.status(500).end()
+    res.status(500).json({
+      message: error.message
+    })
+  }
+});
+
+/**
+ * @params start: start date
+ * @params end: end date
+ * @params limit: default 2
+ * @header profile_id
+ * @returns {totalEarned, professional }
+ */
+app.get('/admin/best-clients',async (req, res) =>{
+  const { start, end, limit = 2 } = req.query
+  const { Job, Contract } = req.app.get('models')
+  try {
+      const results = await Job.findAll({
+          raw: true,
+          attributes: [[fn('SUM', col('price')), 'totalPaid']],
+          include: [{
+              model: Contract,
+              required: true,
+              include: [
+                  {
+                      model: Profile,
+                      required: true,
+                      as: 'Client'
+                  }
+              ]
+          }],
+          where: {
+              paymentDate: { [Op.between]: [start, end] },
+              paid: true
+          },
+          group: ['Contract.ClientId'],
+          order: [[col('totalPaid'), 'DESC']],
+          limit
+      })
+      if(!results.length) return res.status(404).end()
+      res.json(
+          results.map(result => ({
+              id: result['Contract.Client.id'],
+              paid: result.totalPaid,
+              fullName: `${result['Contract.Client.firstName']} ${result['Contract.Client.lastName']}`})
+          )
+      )
+  } catch (error) {
+    res.status(500).json({
+      message: error.message
+    })
   }
 })
 
